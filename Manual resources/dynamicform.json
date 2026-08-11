@@ -5,8 +5,10 @@
                        {
                            "key":  "searchfield",
                            "templateOptions":  {
-                                                   "label":  "Search",
-                                                   "placeholder":  "Username or email address"
+                                                   "label":  "Search field (wildcard search in Display name, UserPrincipalName and mail)",
+                                                   "placeholder":  "Display name, UserPrincipalName, or mail (use * to search all users)",
+                                                   "required":  true,
+                                                   "minLength":  1
                                                },
                            "type":  "input",
                            "summaryVisibility":  "Hide element",
@@ -23,23 +25,35 @@
                                                                 "columns":  [
                                                                                 {
                                                                                     "headerName":  "Display Name",
-                                                                                    "field":  "DisplayName"
+                                                                                    "field":  "displayName"
                                                                                 },
                                                                                 {
                                                                                     "headerName":  "User Principal Name",
-                                                                                    "field":  "UserPrincipalName"
+                                                                                    "field":  "userPrincipalName"
                                                                                 },
                                                                                 {
-                                                                                    "headerName":  "Title",
-                                                                                    "field":  "Title"
+                                                                                    "headerName":  "Mail",
+                                                                                    "field":  "mail"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Description",
+                                                                                    "field":  "description"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Account Enabled",
+                                                                                    "field":  "accountEnabled"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Job Title",
+                                                                                    "field":  "jobTitle"
                                                                                 },
                                                                                 {
                                                                                     "headerName":  "Department",
-                                                                                    "field":  "Department"
+                                                                                    "field":  "department"
                                                                                 },
                                                                                 {
-                                                                                    "headerName":  "Company",
-                                                                                    "field":  "Company"
+                                                                                    "headerName":  "Company Name",
+                                                                                    "field":  "companyName"
                                                                                 }
                                                                             ],
                                                                 "height":  300,
@@ -50,14 +64,16 @@
                                                                             "input":  {
                                                                                           "propertyInputs":  [
                                                                                                                  {
-                                                                                                                     "propertyName":  "searchUser",
+                                                                                                                     "propertyName":  "searchValue",
                                                                                                                      "otherFieldValue":  {
                                                                                                                                              "otherFieldKey":  "searchfield"
                                                                                                                                          }
                                                                                                                  }
                                                                                                              ]
                                                                                       }
-                                                                        }
+                                                                        },
+                                                   "allowCsvDownload":  true,
+                                                   "useFilter":  true
                                                },
                            "type":  "grid",
                            "summaryVisibility":  "Show",
@@ -68,7 +84,7 @@
                    ]
     },
     {
-        "label":  "create Access Pass",
+        "label":  "Create TAP",
         "fields":  [
                        {
                            "key":  "selecteduser",
@@ -82,7 +98,7 @@
                                                                           "label":  "Display name",
                                                                           "useDependOn":  true,
                                                                           "dependOn":  "gridUsers",
-                                                                          "dependOnProperty":  "DisplayName",
+                                                                          "dependOnProperty":  "displayName",
                                                                           "readonly":  true
                                                                       },
                                                   "type":  "input",
@@ -98,7 +114,7 @@
                                                                           "readonly":  true,
                                                                           "useDependOn":  true,
                                                                           "dependOn":  "gridUsers",
-                                                                          "dependOnProperty":  "UserPrincipalName"
+                                                                          "dependOnProperty":  "userPrincipalName"
                                                                       },
                                                   "type":  "input",
                                                   "summaryVisibility":  "Hide element",
@@ -113,14 +129,28 @@
                            "requiresDataSource":  false
                        },
                        {
-                           "key":  "lifteTimeHours",
+                           "key":  "lifteTimeMinutes",
                            "templateOptions":  {
-                                                   "label":  "lifetime (hours)",
-                                                   "max":  12,
-                                                   "min":  1
+                                                   "label":  "lifetime (minutes)",
+                                                   "min":  1,
+                                                   "required":  true
                                                },
                            "type":  "number",
-                           "defaultValue":  "10",
+                           "defaultValue":  "60",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "isUsableOnce",
+                           "templateOptions":  {
+                                                   "label":  "Is Usable Once",
+                                                   "useSwitch":  true,
+                                                   "checkboxLabel":  "Yes"
+                                               },
+                           "type":  "boolean",
+                           "defaultValue":  true,
                            "summaryVisibility":  "Show",
                            "requiresTemplateOptions":  true,
                            "requiresKey":  true,
@@ -143,7 +173,7 @@
                            "key":  "tempAccessPass",
                            "templateOptions":  {
                                                    "label":  "Temporary Access Pass",
-                                                   "required":  false,
+                                                   "required":  true,
                                                    "grid":  {
                                                                 "columns":  [
                                                                                 {
@@ -151,12 +181,28 @@
                                                                                     "field":  "temporaryAccessPass"
                                                                                 },
                                                                                 {
-                                                                                    "headerName":  "Lifetime In Hours",
-                                                                                    "field":  "lifetimeInHours"
+                                                                                    "headerName":  "Is Usable",
+                                                                                    "field":  "isUsable"
                                                                                 },
                                                                                 {
-                                                                                    "headerName":  "Start Date",
+                                                                                    "headerName":  "Is Usable Once",
+                                                                                    "field":  "isUsableOnce"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Lifetime In Minutes",
+                                                                                    "field":  "lifetimeInMinutes"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Method Usability Reason",
+                                                                                    "field":  "methodUsabilityReason"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Start Date Time",
                                                                                     "field":  "startDateTime"
+                                                                                },
+                                                                                {
+                                                                                    "headerName":  "Created Date Time",
+                                                                                    "field":  "createdDateTime"
                                                                                 }
                                                                             ],
                                                                 "height":  200,
@@ -173,17 +219,25 @@
                                                                                                                                          }
                                                                                                                  },
                                                                                                                  {
-                                                                                                                     "propertyName":  "lifeTimeHours",
+                                                                                                                     "propertyName":  "lifetimeMinutes",
                                                                                                                      "otherFieldValue":  {
-                                                                                                                                             "otherFieldKey":  "lifteTimeHours"
+                                                                                                                                             "otherFieldKey":  "lifteTimeMinutes"
+                                                                                                                                         }
+                                                                                                                 },
+                                                                                                                 {
+                                                                                                                     "propertyName":  "isUsableOnce",
+                                                                                                                     "otherFieldValue":  {
+                                                                                                                                             "otherFieldKey":  "isUsableOnce"
                                                                                                                                          }
                                                                                                                  }
                                                                                                              ]
                                                                                       }
                                                                         },
                                                    "useFilter":  true,
-                                                   "useDefault":  false,
-                                                   "searchPlaceHolder":  "Search this data"
+                                                   "useDefault":  true,
+                                                   "searchPlaceHolder":  "Search this data",
+                                                   "allowCsvDownload":  true,
+                                                   "defaultSelectorProperty":  "temporaryAccessPass"
                                                },
                            "hideExpression":  "!model[\"temporaryAccessPass\"]",
                            "type":  "grid",

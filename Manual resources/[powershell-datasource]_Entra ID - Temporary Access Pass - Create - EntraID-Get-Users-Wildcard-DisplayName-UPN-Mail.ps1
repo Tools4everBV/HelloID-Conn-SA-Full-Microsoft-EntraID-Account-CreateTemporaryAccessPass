@@ -1,9 +1,11 @@
 # Variables configured in form
-$userID = $datasource.selecteduser.ID
-$userDisplayname = $datasource.selecteduser.displayname
-$lifetimeMinutes = [int]$datasource.lifetimeMinutes
-$isUsableOnce = [int]$datasource.isUsableOnce
-$startdate = [System.DateTime]::Parse((Get-Date).DateTime)
+$searchValue = $datasource.searchValue
+if ($searchValue -eq "*") {
+    $filter = "`$filter=displayName ne null" # Get all users
+}
+else {
+    $filter = "`$search=`"displayName:$searchValue`" OR `"userPrincipalName:$searchValue`" OR `"mail:$searchValue`""
+}
 
 # Global variables
 # Outcommented as these are set from Global Variables
@@ -15,14 +17,15 @@ $startdate = [System.DateTime]::Parse((Get-Date).DateTime)
 # Fixed values
 $propertiesToSelect = @(
     "id",
-    "isUsable",
-    "isUsableOnce",
-    "temporaryAccessPass",
-    "lifetimeInMinutes",
-    "createdDateTime",
-    "startDateTime",
-    "methodUsabilityReason"
-) # Properties to select from Temporary Access Pass result
+    "userPrincipalName",
+    "displayName",
+    "mail",
+    "description",
+    "department",
+    "jobTitle",
+    "companyName",
+    "accountEnabled"
+) # Properties to select from Microsoft Graph API, comma separated
 
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
@@ -139,6 +142,11 @@ function Get-MSEntraAccessToken {
         $signature = $rsa.SignData([Text.Encoding]::UTF8.GetBytes($signatureInput), 'SHA256')
         $base64Signature = [System.Convert]::ToBase64String($signature).Replace('+', '-').Replace('/', '_').Replace('=', '')
 
+        # Ensure the certificate has a private key
+        if (-not $Certificate.HasPrivateKey -or -not $Certificate.PrivateKey) {
+            throw "The certificate does not have a private key."
+        }
+
         # Create the JWT token
         $jwtToken = "$($base64Header).$($base64Payload).$($base64Signature)"
 
@@ -195,61 +203,54 @@ try {
     # Convert base64 certificate string to certificate object
     $actionMessage = "converting base64 certificate string to certificate object"
     $certificate = Get-MSEntraCertificate -CertificateBase64String $EntraIdCertificateBase64String -CertificatePassword $EntraIdCertificatePassword
-    Write-Verbose "Converted base64 certificate string to certificate object"
 
     # Create access token
     $actionMessage = "creating access token"
     $entraToken = Get-MSEntraAccessToken -Certificate $certificate -AppId $EntraIdAppId -TenantId $EntraIdTenantId
-    Write-Verbose "Created access token"
 
     # Create headers
     $actionMessage = "creating headers"
     $headers = @{
-        "Authorization" = "Bearer $($entraToken)"
-        "Accept"        = "application/json"
-        "Content-Type"  = "application/json"
-    }
-    Write-Verbose "Created headers"
-
-    # Create body for Temporary Access Pass request
-    $actionMessage = "creating Temporary Access Pass request body"
-    $body = @{
-        startDateTime     = $startdate
-        lifetimeInMinutes = $lifetimeMinutes
-        isUsableOnce      = $true
-    } | ConvertTo-Json -Depth 10
-    Write-Verbose "Created request body with lifetime of [$lifetimeMinutes] minutes"
-
-    # Generate Temporary Access Pass
-    # API docs: https://learn.microsoft.com/en-us/graph/api/authentication-post-temporaryaccesspassmethods?view=graph-rest-1.0&tabs=http
-    $actionMessage = "generating Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$lifetimeMinutes] minutes"
-    $generateTAPSplatParams = @{
-        Uri         = "https://graph.microsoft.com/v1.0/users/$userID/authentication/temporaryAccessPassMethods"
-        Headers     = $headers
-        Method      = "POST"
-        Body        = $body
-        Verbose     = $false
-        ErrorAction = "Stop"
+        "Authorization"    = "Bearer $($entraToken)"
+        "Accept"           = "application/json"
+        "Content-Type"     = "application/json"
+        "ConsistencyLevel" = "eventual" # Needed to filter on specific attributes (https://docs.microsoft.com/en-us/graph/aad-advanced-queries)
     }
 
-    $result = Invoke-RestMethod @generateTAPSplatParams
-    Write-Information "Successfully generated Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$($result.lifetimeInMinutes)] minutes"
+    # Get Microsoft Entra ID Users
+    # API docs: https://learn.microsoft.com/en-us/graph/api/user-list?view=graph-rest-1.0&tabs=http
+    $actionMessage = "querying Microsoft Entra ID Users matching filter [$filter]"
+    $microsoftEntraIDUsers = [System.Collections.ArrayList]@()
+    do {
+        $getMicrosoftEntraIDUsersSplatParams = @{
+            Uri         = "https://graph.microsoft.com/v1.0/users?$filter&`$select=$($propertiesToSelect -join ',')&`$top=999&`$count=true"
+            Headers     = $headers
+            Method      = "GET"
+            Verbose     = $false
+            ErrorAction = "Stop"
+        }
+        if (-not[string]::IsNullOrEmpty($getMicrosoftEntraIDUsersResponse.'@odata.nextLink')) {
+            $getMicrosoftEntraIDUsersSplatParams["Uri"] = $getMicrosoftEntraIDUsersResponse.'@odata.nextLink'
+        }
+        
+        $getMicrosoftEntraIDUsersResponse = $null
+        $getMicrosoftEntraIDUsersResponse = Invoke-RestMethod @getMicrosoftEntraIDUsersSplatParams
+    
+        # Select only specified properties to limit memory usage
+        $getMicrosoftEntraIDUsersResponse.Value = $getMicrosoftEntraIDUsersResponse.Value | Select-Object $propertiesToSelect
 
-    $Log = @{
-        Action            = "SetPassword" # optional. ENUM (undefined = default) 
-        System            = "EntraID" # optional (free format text) 
-        Message           = "Successfully generated Temporary Access Pass with lifetime [$($result.lifetimeInMinutes)] minutes" # required (free format text) 
-        IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
-        TargetDisplayName = $userDisplayname # optional (free format text) 
-        TargetIdentifier  = $userID # optional (free format text) 
-    }
-
-    # Send result back  
-    Write-Information -Tags "Audit" -MessageData $log
+        if ($getMicrosoftEntraIDUsersResponse.Value -is [array]) {
+            [void]$microsoftEntraIDUsers.AddRange($getMicrosoftEntraIDUsersResponse.Value)
+        }
+        else {
+            [void]$microsoftEntraIDUsers.Add($getMicrosoftEntraIDUsersResponse.Value)
+        }
+    } while (-not[string]::IsNullOrEmpty($getMicrosoftEntraIDUsersResponse.'@odata.nextLink'))
+    Write-Information "Queried Microsoft Entra ID Users matching filter [$filter]. Result count: $(@($microsoftEntraIDUsers).Count)"
 
     # Send results to HelloID
     $actionMessage = "sending results to HelloID"
-    $result | Select-Object -Property $propertiesToSelect | ForEach-Object {
+    $microsoftEntraIDUsers | ForEach-Object {
         Write-Output $_
     }
 }
@@ -260,33 +261,12 @@ catch {
         $errorObj = Resolve-MicrosoftGraphAPIError -ErrorObject $ex
         $auditMessage = "Error $($actionMessage). Error: $($errorObj.FriendlyMessage)"
         $warningMessage = "Error at Line [$($errorObj.ScriptLineNumber)]: $($errorObj.Line). Error: $($errorObj.ErrorDetails)"
-        
-        # Check for specific Temporary Access Pass policy error
-        if ($auditMessage -like "*UserCredentialPolicy does not allow*TemporaryAccessPass*") {
-            $auditMessage = "Error $($actionMessage). Temporary Access Pass is not enabled in the Entra ID Authentication Methods Policy. Please enable it in Entra ID Admin Center > Protection > Authentication methods > Temporary Access Pass. Error: $($errorObj.FriendlyMessage)"
-        }
     }
     else {
         $auditMessage = "Error $($actionMessage). Error: $($ex.Exception.Message)"
         $warningMessage = "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
     }
-
-    $Log = @{
-        Action            = "SetPassword" # optional. ENUM (undefined = default) 
-        System            = "EntraID" # optional (free format text) 
-        Message           = $auditMessage # required (free format text) 
-        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
-        TargetDisplayName = $userDisplayname # optional (free format text) 
-        TargetIdentifier  = $userID # optional (free format text) 
-    }
-    Write-Information -Tags "Audit" -MessageData $log
     Write-Warning $warningMessage
     Write-Error $auditMessage
-
-    # Return error in output
-    $errorMessage = if ($null -ne $errorObj) { $errorObj.FriendlyMessage } else { $ex.Exception.Message }
-    $output = @{
-        temporaryAccessPass = "Error: $errorMessage"
-    }
-    Write-Output $output
 }
+  
