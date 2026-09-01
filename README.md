@@ -1,123 +1,94 @@
+# HelloID-Conn-SA-Full-AzureAD-Account-CreateTemporaryAccessPass
 
-<!-- Description -->
+| :information_source: Information |
+|:---------------------------|
+| This repository contains the connector and configuration code only. The implementer is responsible for acquiring the connection details such as certificate, tenant ID, and application ID. You might need administrator consent and to configure an App Registration in Microsoft Entra ID before implementing this connector. Please contact the client's application owner to coordinate the requirements. |
+
 ## Description
-This HelloID Service Automation Delegated Form can create a temporary Access Pass. The following options are available:
- 1. Search and select the target user
- 2. Choose a timelimit in hours
- 3. A switch to generate temporary Access Pass immediately
-    1. The Acccess pass will created in the Form and shown in a grid
- 4. There is no task configured.
+HelloID-Conn-SA-Full-AzureAD-Account-CreateTemporaryAccessPass is a delegated form designed for use with HelloID Service Automation (SA). It can be imported into HelloID and customized according to your requirements.
 
-## Versioning
-| Version | Description | Date |
-| - | - | - |
-| 1.0.0   | Initial release | 2024/03/11  |
+By using this delegated form, you can create a Temporary Access Pass for Microsoft Entra ID (formerly Azure AD) user accounts. The following options are available:
 
-<!-- Requirements -->
-## Requirements
-This script uses the Microsoft Graph API and requires an App Registration with App permissions:
-*	Read and Write all user's full profiles by using *__User.ReadWrite.All__*
-*	Read and write all user's authentication methods *__UserAuthenticationMethod.ReadWrite.All__*
+1. Search for and select the target Microsoft Entra ID user account (wildcard search by display name, UserPrincipalName, or mail).
+2. Configure the lifetime of the Temporary Access Pass in minutes (default: 60 minutes).
+3. Specify whether the Temporary Access Pass is usable once (single-use) or multiple times (default: single-use).
+4. Choose to create the Temporary Access Pass immediately (the TAP will be displayed in the form grid with all details).
 
+## Getting started
 
-<!-- TABLE OF CONTENTS -->
-## Table of Contents
-- [Description](#description)
-- [Versioning](#versioning)
-- [Requirements](#requirements)
-- [Table of Contents](#table-of-contents)
-- [Introduction](#introduction)
-- [Getting the Azure AD graph API access](#getting-the-azure-ad-graph-api-access)
-  - [Application Registration](#application-registration)
-  - [Configuring App Permissions](#configuring-app-permissions)
-  - [Authentication and Authorization](#authentication-and-authorization)
-  - [Temporary Access Pass Permissions](#Temporary-access-pass-permissions)
-- [All-in-one PowerShell setup script](#all-in-one-powershell-setup-script)
-  - [Getting started](#getting-started)
-- [Post-setup configuration](#post-setup-configuration)
-- [Manual resources](#manual-resources)
-  - [Powershell data source 'Azure-AD-temp-access-pass-generate-user-table-wildcard'](#powershell-data-source-Azure-AD-temp-access-pass-generate-user-table-wildcard)
-  - [Powershell data source 'Azure-AD-temp-access-pass-create-access-pass'](#powershell-data-source-Azure-AD-temp-access-pass-create-access-pass)
-- [Getting help](#getting-help)
-- [HelloID Docs](#helloid-docs)
+### Requirements
 
+#### App Registration & Certificate Setup
+Before implementing this connector, make sure to configure a Microsoft Entra ID App Registration. During the setup process, you'll create a new App Registration in the Entra portal, assign the necessary API permissions (such as user and authentication method read/write), and generate and assign a certificate.
 
-## Introduction
-The interface to communicate with Microsoft Azure AD is through the Microsoft Graph API.
+Follow the official Microsoft documentation for creating an App Registration and setting up certificate-based authentication:
 
-<!-- GETTING STARTED -->
-## Getting the Azure AD graph API access
+* [App-only authentication with certificate](https://learn.microsoft.com/en-us/powershell/exchange/app-only-auth-powershell-v2?view=exchange-ps#set-up-app-only-authentication)
 
-By using this connector you will have the ability to create a temporary Access Pass for an Azure AD User.
+#### HelloID-specific configuration
+Once you have completed the Microsoft setup and followed their best practices, configure the following HelloID-specific requirements.
 
-### Application Registration
-The first step to connect to Graph API and make requests, is to register a new __Azure Active Directory Application__. The application is used to connect to the API and to manage permissions.
+* API Permissions (Application permissions):
+  * `User.ReadWrite.All` - To read and write user information
+  * `UserAuthenticationMethod.ReadWrite.All` - To read and write user authentication methods
+* Certificate Base64 encoded string:
+  * Base64 encoded string of the certificate assigned to the app registration. For instructions on creating the certificate and obtaining the base64 string, refer to our forum post: [Setting up a certificate for Microsoft Graph API in HelloID connectors](https://forum.helloid.com/forum/helloid-provisioning/5338-instruction-setting-up-a-certificate-for-microsoft-graph-api-in-helloid-connectors#post5338)
 
-* Navigate to __App Registrations__ in Azure, and select “New Registration” (__Azure Portal > Azure Active Directory > App Registration > New Application Registration__).
-* Next, give the application a name. In this example we are using “__HelloID PowerShell__” as application name.
-* Specify who can use this application (__Accounts in this organizational directory only__).
-* Specify the Redirect URI. You can enter any url as a redirect URI value. In this example we used http://localhost because it doesn't have to resolve.
-* Click the “__Register__” button to finally create your new application.
+### Connection settings
+The following global variables must be configured in HelloID when importing and configuring the delegated form.
 
-Some key items regarding the application are the Application ID (which is the Client ID), the Directory ID (which is the Tenant ID) and Client Secret.
+| Variable name | Description | Required |
+| ------------- | ----------- | -------- |
+| EntraIdTenantId | The unique identifier (ID) of the tenant in Microsoft Entra ID | Yes |
+| EntraIdAppId | The unique identifier (ID) of the App Registration in Microsoft Entra ID | Yes |
+| EntraIdCertificateBase64String | The Base64-encoded string representation of the app certificate | Yes |
+| EntraIdCertificatePassword | The password associated with the app certificate | Yes |
 
-### Configuring App Permissions
-The [Microsoft Graph documentation](https://docs.microsoft.com/en-us/graph) provides details on which permission are required for each permission type.
+## Remarks
 
-To assign your application the right permissions, navigate to __Azure Portal > Azure Active Directory >App Registrations__.
-Select the application we created before, and select “__API Permissions__” or “__View API Permissions__”.
-To assign a new permission to your application, click the “__Add a permission__” button.
-From the “__Request API Permissions__” screen click “__Microsoft Graph__”.
-For this connector the following permissions are used as __Application permissions__:
-*	Read and Write all user’s full profiles by using *__User.ReadWrite.All__*
-* Read and write all users' authentication methods *__UserAuthenticationMethod.ReadWrite.All__*
+### User Search
+* Search Functionality: Users can search for accounts using a wildcard (`*`) to return all users, or by entering partial text to search across user attributes (display name, User Principal Name, or mail address).
 
-Some high-privilege permissions can be set to admin-restricted and require an administrators consent to be granted.
+### Temporary Access Pass Configuration
+* Lifetime: The lifetime of the Temporary Access Pass is configured in minutes through the form field "lifetime (minutes)". The default value is 60 minutes.
+* Single-Use Option: The form includes a switch "Is Usable Once" to determine whether the TAP can be used once (single-use) or multiple times. The default value is single-use (true).
+* Immediate Creation: When the "Create Temporary Access Pass Now" switch is enabled, the TAP is generated immediately via the datasource and displayed in a grid with the following details:
+  * Temporary Access Pass (the actual password)
+  * Is Usable (whether the TAP is currently usable)
+  * Is Usable Once (single-use or multi-use)
+  * Lifetime In Minutes (configured lifetime)
+  * Method Usability Reason (reason for current usability status)
+  * Start Date Time (when the TAP becomes valid)
+  * Created Date Time (when the TAP was created)
 
-To grant admin consent to our application press the “__Grant admin consent for TENANT__” button.
+### Certificate-Based Authentication
+* JWT Token Generation: The connector uses certificate-based authentication to generate JSON Web Tokens (JWT) for secure communication with Microsoft Graph API. The certificate is converted from a base64 string and used to sign the JWT assertion for OAuth2 authentication.
 
-### Authentication and Authorization
-There are multiple ways to authenticate to the Graph API with each has its own pros and cons, in this example we are using the Authorization Code grant type.
+### Error Handling
+* Validation: The form validates user input including the required user selection and lifetime configuration before creating the Temporary Access Pass.
+* Comprehensive Error Messages: The connector uses the `Resolve-MicrosoftGraphAPIError` function to provide detailed error information including script line numbers and friendly error messages.
+* TAP Creation: Each form submission creates a new Temporary Access Pass. The TAP is created via a datasource and displayed in the form grid for the administrator to copy and securely provide to the user.
 
-*	First we need to get the __Client ID__, go to the __Azure Portal > Azure Active Directory > App Registrations__.
-*	Select your application and copy the Application (client) ID value.
-*	After we have the Client ID we also have to create a __Client Secret__.
-*	From the Azure Portal, go to __Azure Active Directory > App Registrations__.
-*	Select the application we have created before, and select "__Certificates and Secrets__". 
-*	Under “Client Secrets” click on the “__New Client Secret__” button to create a new secret.
-*	Provide a logical name for your secret in the Description field, and select the expiration date for your secret.
-*	It's IMPORTANT to copy the newly generated client secret, because you cannot see the value anymore after you close the page.
-*	At least we need to get is the __Tenant ID__. This can be found in the Azure Portal by going to __Azure Active Directory > Custom Domain Names__, and then finding the .onmicrosoft.com domain.
+## Development resources
 
-## All-in-one PowerShell setup script
-The PowerShell script "createform.ps1" contains a complete PowerShell script using the HelloID API to create the complete Form including user defined variables, tasks and data sources.
+### API endpoints
+The following Microsoft Graph API endpoints are used by the connector:
 
-_Please note that this script asumes none of the required resources do exists within HelloID. The script does not contain versioning or source control_
+| Endpoint | Description |
+| -------- | ----------- |
+| /v1.0/users | List users |
+| /v1.0/users/{id}/authentication/temporaryAccessPassMethods | Create Temporary Access Pass |
 
-### Getting started
-Please follow the documentation steps on [HelloID Docs](https://docs.helloid.com/hc/en-us/articles/360017556559-Service-automation-GitHub-resources) in order to setup and run the All-in one Powershell Script in your own environment.
-
-## Post-setup configuration
-After the all-in-one PowerShell script has run and created all the required resources. The following items need to be configured according to your own environment
- 1. Update the following [user defined variables](https://docs.helloid.com/hc/en-us/articles/360014169933-How-to-Create-and-Manage-User-Defined-Variables)
-<table>
-  <tr><td><strong>Variable name</strong></td><td><strong>Example value</strong></td><td><strong>Description</strong></td></tr>
-  <tr><td>AADtenantID</td><td>Azure AD Tenant Id</td><td>Id of the Azure tenant</td></tr>
-  <tr><td>AADAppId</td><td>Azure AD App Id</td><td>Id of the Azure app</td></tr>
-<tr><td>AADAppSecret</td><td>Azure AD App Secret</td><td>Secreat of the Azure app</td></tr>
-</table>
-
-## Manual resources
-This Delegated Form uses the following resources in order to run
-
-#### Powershell data source 'Azure-AD-temp-access-pass-generate-user-table-wildcard'
-
-#### Powershell data source 'Azure-AD-temp-access-pass-create-access-pass'
-
-#### Delegated form task is not configured
+### API documentation
+* [List users](https://learn.microsoft.com/en-us/graph/api/user-list)
+* [Create temporaryAccessPassAuthenticationMethod](https://learn.microsoft.com/en-us/graph/api/authentication-post-temporaryaccesspassmethods)
+* [temporaryAccessPassAuthenticationMethod resource type](https://learn.microsoft.com/en-us/graph/api/resources/temporaryaccesspassauthenticationmethod)
 
 ## Getting help
-_If you need help, feel free to ask questions on our [forum](https://forum.helloid.com/forum/helloid-connectors/service-automation/194-helloid-sa-azure-ad-reset-password-enable-user)_
 
-## HelloID Docs
-The official HelloID documentation can be found at: https://docs.helloid.com/
+| :bulb: Tip |
+|:---------------------------|
+| For more information on Delegated Forms, please refer to our [documentation](https://docs.helloid.com/en/service-automation/delegated-forms.html) pages. |
+
+## HelloID docs
+The official HelloID documentation can be found at: [https://docs.helloid.com/](https://docs.helloid.com/)

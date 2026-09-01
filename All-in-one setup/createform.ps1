@@ -7,7 +7,7 @@ $portalUrl = "https://CUSTOMER.helloid.com"
 $apiKey = "API_KEY"
 $apiSecret = "API_SECRET"
 $delegatedFormAccessGroupNames = @("") #Only unique names are supported. Groups must exist!
-$delegatedFormCategories = @("User Management","Azure Active Directory") #Only unique names are supported. Categories will be created if not exists
+$delegatedFormCategories = @("User Management","Entra ID") #Only unique names are supported. Categories will be created if not exists
 $script:debugLogging = $false #Default value: $false. If $true, the HelloID resource GUIDs will be shown in the logging
 $script:duplicateForm = $false #Default value: $false. If $true, the HelloID resource names will be changed to import a duplicate Form
 $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID resource names to generate a duplicate form with different resource names
@@ -16,40 +16,33 @@ $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID re
 #NOTE: You can also update the HelloID Global variable values afterwards in the HelloID Admin Portal: https://<CUSTOMER>.helloid.com/admin/variablelibrary
 $globalHelloIDVariables = [System.Collections.Generic.List[object]]@();
 
-#Global variable #1 >> AADtenantID
+#Global variable #1 >> EntraIdCertificatePassword
 $tmpName = @'
-AADtenantID
-'@ 
-$tmpValue = @'
-76fd1191-d586-4fe3-8242-c0b1bba18f4f
-'@ 
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
-
-#Global variable #2 >> AADAppId
-$tmpName = @'
-AADAppId
-'@ 
-$tmpValue = @'
-fb474a09-3833-4c2e-97b1-39b50a69a5b1
-'@ 
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
-
-#Global variable #3 >> AADAppSecret
-$tmpName = @'
-AADAppSecret
+EntraIdCertificatePassword
 '@ 
 $tmpValue = "" 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
 
-#Global variable #4 >> companyName
+#Global variable #2 >> EntraIdCertificateBase64String
 $tmpName = @'
-companyName
+EntraIdCertificateBase64String
 '@ 
-$tmpValue = @'
-{{company.name}}
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
+
+#Global variable #3 >> EntraIDAppId
+$tmpName = @'
+EntraIDAppId
 '@ 
+$tmpValue = "" 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
+#Global variable #4 >> EntraIDtenantID
+$tmpName = @'
+EntraIDtenantID
+'@ 
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
 
 #make sure write-information logging is visual
 $InformationPreference = "continue"
@@ -104,7 +97,7 @@ function Invoke-HelloIDGlobalVariable {
     try {
         $uri = ($script:PortalBaseUrl + "api/v1/automation/variables/named/$Name")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
-    
+
         if ([string]::IsNullOrEmpty($response.automationVariableGuid)) {
             #Create Variable
             $body = @{
@@ -114,7 +107,7 @@ function Invoke-HelloIDGlobalVariable {
                 ItemType = 0;
             }    
             $body = ConvertTo-Json -InputObject $body -Depth 100
-    
+
             $uri = ($script:PortalBaseUrl + "api/v1/automation/variable")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
             $variableGuid = $response.automationVariableGuid
@@ -140,14 +133,14 @@ function Invoke-HelloIDAutomationTask {
         [parameter()][String][AllowEmptyString()]$ForceCreateTask,
         [parameter(Mandatory)][Ref]$returnObject
     )
-    
+
     $TaskName = $TaskName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
 
     try {
         $uri = ($script:PortalBaseUrl +"api/v1/automationtasks?search=$TaskName&container=$AutomationContainer")
         $responseRaw = (Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false) 
         $response = $responseRaw | Where-Object -filter {$_.name -eq $TaskName}
-    
+
         if([string]::IsNullOrEmpty($response.automationTaskGuid) -or $ForceCreateTask -eq $true) {
             #Create Task
 
@@ -160,7 +153,7 @@ function Invoke-HelloIDAutomationTask {
                 variables           = (ConvertFrom-Json-WithEmptyArray($Variables));
             }
             $body = ConvertTo-Json -InputObject $body -Depth 100
-    
+
             $uri = ($script:PortalBaseUrl +"api/v1/automationtasks/powershell")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
             $taskGuid = $response.automationTaskGuid
@@ -187,6 +180,7 @@ function Invoke-HelloIDDatasource {
         [parameter()][String][AllowEmptyString()]$DatasourcePsScript,        
         [parameter()][String][AllowEmptyString()]$DatasourceInput,
         [parameter()][String][AllowEmptyString()]$AutomationTaskGuid,
+        [parameter()][String][AllowEmptyString()]$DatasourceRunInCloud,
         [parameter(Mandatory)][Ref]$returnObject
     )
 
@@ -198,11 +192,11 @@ function Invoke-HelloIDDatasource {
         "3" { "Task data source"; break} 
         "4" { "Powershell data source"; break}
     }
-    
+
     try {
         $uri = ($script:PortalBaseUrl +"api/v1/datasource/named/$DatasourceName")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
-      
+    
         if([string]::IsNullOrEmpty($response.dataSourceGUID)) {
             #Create DataSource
             $body = @{
@@ -213,12 +207,13 @@ function Invoke-HelloIDDatasource {
                 value              = (ConvertFrom-Json-WithEmptyArray($DatasourceStaticValue));
                 script             = $DatasourcePsScript;
                 input              = (ConvertFrom-Json-WithEmptyArray($DatasourceInput));
+                runInCloud         = $DatasourceRunInCloud;
             }
             $body = ConvertTo-Json -InputObject $body -Depth 100
-      
+    
             $uri = ($script:PortalBaseUrl +"api/v1/datasource")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
-              
+            
             $datasourceGuid = $response.dataSourceGUID
             Write-Information "$datasourceTypeName '$DatasourceName' created$(if ($script:debugLogging -eq $true) { ": " + $datasourceGuid })"
         } else {
@@ -227,7 +222,7 @@ function Invoke-HelloIDDatasource {
             Write-Warning "$datasourceTypeName '$DatasourceName' already exists$(if ($script:debugLogging -eq $true) { ": " + $datasourceGuid })"
         }
     } catch {
-      Write-Error "$datasourceTypeName '$DatasourceName', message: $_"
+        Write-Error "$datasourceTypeName '$DatasourceName', message: $_"
     }
 
     $returnObject.Value = $datasourceGuid
@@ -239,7 +234,7 @@ function Invoke-HelloIDDynamicForm {
         [parameter(Mandatory)][String]$FormSchema,
         [parameter(Mandatory)][Ref]$returnObject
     )
-    
+
     $FormName = $FormName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
 
     try {
@@ -249,7 +244,7 @@ function Invoke-HelloIDDynamicForm {
         } catch {
             $response = $null
         }
-    
+
         if(([string]::IsNullOrEmpty($response.dynamicFormGUID)) -or ($response.isUpdated -eq $true)) {
             #Create Dynamic form
             $body = @{
@@ -257,10 +252,10 @@ function Invoke-HelloIDDynamicForm {
                 FormSchema = (ConvertFrom-Json-WithEmptyArray($FormSchema));
             }
             $body = ConvertTo-Json -InputObject $body -Depth 100
-    
+
             $uri = ($script:PortalBaseUrl +"api/v1/forms")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
-    
+
             $formGuid = $response.dynamicFormGUID
             Write-Information "Dynamic form '$formName' created$(if ($script:debugLogging -eq $true) { ": " + $formGuid })"
         } else {
@@ -296,7 +291,7 @@ function Invoke-HelloIDDelegatedForm {
         } catch {
             $response = $null
         }
-    
+
         if([string]::IsNullOrEmpty($response.delegatedFormGUID)) {
             #Create DelegatedForm
             $body = @{
@@ -313,10 +308,10 @@ function Invoke-HelloIDDelegatedForm {
                 }
             }
             $body = ConvertTo-Json -InputObject $body -Depth 100
-    
+
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
-    
+
             $delegatedFormGuid = $response.delegatedFormGUID
             Write-Information "Delegated form '$DelegatedFormName' created$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormGuid })"
             $delegatedFormCreated = $true
@@ -338,7 +333,6 @@ function Invoke-HelloIDDelegatedForm {
     $returnObject.value.created = $delegatedFormCreated
 }
 
-
 <# Begin: HelloID Global Variables #>
 foreach ($item in $globalHelloIDVariables) {
 	Invoke-HelloIDGlobalVariable -Name $item.name -Value $item.value -Secret $item.secret 
@@ -347,192 +341,611 @@ foreach ($item in $globalHelloIDVariables) {
 
 
 <# Begin: HelloID Data sources #>
-<# Begin: DataSource "Azure-AD-temp-access-pass-create-access-pass" #>
+<# Begin: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Temp-Access-Pass-Create-Access-Pass" #>
 $tmpPsScript = @'
-# Set TLS to accept TLS, TLS 1.1 and TLS 1.2
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
+# Variables configured in form
+$userID = $datasource.selecteduser.ID
+$userDisplayname = $datasource.selecteduser.displayname
+$lifetimeMinutes = [int]$datasource.lifetimeMinutes
+$isUsableOnce = if($datasource.isUsableOnce -eq 'true') {$true} else {$false}
+$startdate = [System.DateTime]::Parse((Get-Date).DateTime)
 
-$VerbosePreference = "SilentlyContinue" # / SilentlyContinue/Continue
+# Global variables
+# Outcommented as these are set from Global Variables
+# $EntraIdTenantId = ""
+# $EntraIdAppId = ""
+# $EntraIdCertificateBase64String = ""
+# $EntraIdCertificatePassword = ""
+
+# Fixed values
+$propertiesToSelect = @(
+    "id",
+    "isUsable",
+    "isUsableOnce",
+    "temporaryAccessPass",
+    "lifetimeInMinutes",
+    "createdDateTime",
+    "startDateTime",
+    "methodUsabilityReason"
+) # Properties to select from Temporary Access Pass result
+
+# Enable TLS1.2
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+
+# Set debug logging
+$VerbosePreference = "SilentlyContinue"
 $InformationPreference = "Continue"
 $WarningPreference = "Continue"
 
+#region functions
+function Resolve-MicrosoftGraphAPIError {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [object]
+        $ErrorObject
+    )
+    process {
+        $httpErrorObj = [PSCustomObject]@{
+            ScriptLineNumber = $ErrorObject.InvocationInfo.ScriptLineNumber
+            Line             = $ErrorObject.InvocationInfo.Line
+            ErrorDetails     = $ErrorObject.Exception.Message
+            FriendlyMessage  = $ErrorObject.Exception.Message
+        }
+        if (-not [string]::IsNullOrEmpty($ErrorObject.ErrorDetails.Message)) {
+            $httpErrorObj.ErrorDetails = $ErrorObject.ErrorDetails.Message
+        }
+        elseif ($ErrorObject.Exception.GetType().FullName -eq 'System.Net.WebException') {
+            if ($null -ne $ErrorObject.Exception.Response) {
+                $streamReaderResponse = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()
+                if (-not [string]::IsNullOrEmpty($streamReaderResponse)) {
+                    $httpErrorObj.ErrorDetails = $streamReaderResponse
+                }
+            }
+        }
+        try {
+            $errorDetailsObject = ($httpErrorObj.ErrorDetails | ConvertFrom-Json -ErrorAction Stop)
+            if ($errorDetailsObject.error_description) {
+                $httpErrorObj.FriendlyMessage = $errorDetailsObject.error_description
+            }
+            elseif ($errorDetailsObject.error.message) {
+                $httpErrorObj.FriendlyMessage = "$($errorDetailsObject.error.code): $($errorDetailsObject.error.message)"
+            }
+            elseif ($errorDetailsObject.error.details.message) {
+                $httpErrorObj.FriendlyMessage = "$($errorDetailsObject.error.details.code): $($errorDetailsObject.error.details.message)"
+            }
+            else {
+                $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails
+            }
+        }
+        catch {
+            $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails
+        }
+        Write-Output $httpErrorObj
+    }
+}
+
+function Get-MSEntraAccessToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        $Certificate,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $AppId,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $TenantId
+    )
+    try {
+        # Get the DER encoded bytes of the certificate
+        $derBytes = $Certificate.RawData
+
+        # Compute the SHA-256 hash of the DER encoded bytes
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        $hashBytes = $sha256.ComputeHash($derBytes)
+        $base64Thumbprint = [System.Convert]::ToBase64String($hashBytes).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Create a JWT (JSON Web Token) header
+        $header = @{
+            'alg'      = 'RS256'
+            'typ'      = 'JWT'
+            'x5t#S256' = $base64Thumbprint
+        } | ConvertTo-Json
+        $base64Header = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($header))
+
+        # Calculate the Unix timestamp (seconds since 1970-01-01T00:00:00Z) for 'exp', 'nbf' and 'iat'
+        $currentUnixTimestamp = [math]::Round(((Get-Date).ToUniversalTime() - ([datetime]'1970-01-01T00:00:00Z').ToUniversalTime()).TotalSeconds)
+
+        # Create a JWT payload
+        $payload = [Ordered]@{
+            'iss' = "$($AppId)"
+            'sub' = "$($AppId)"
+            'aud' = "https://login.microsoftonline.com/$($TenantId)/oauth2/token"
+            'exp' = ($currentUnixTimestamp + 3600) # Expires in 1 hour
+            'nbf' = ($currentUnixTimestamp - 300) # Not before 5 minutes ago
+            'iat' = $currentUnixTimestamp
+            'jti' = [Guid]::NewGuid().ToString()
+        } | ConvertTo-Json
+        $base64Payload = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($payload)).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Extract the private key from the certificate
+        $rsaPrivate = $Certificate.PrivateKey
+        $rsa = [System.Security.Cryptography.RSACryptoServiceProvider]::new()
+        $rsa.ImportParameters($rsaPrivate.ExportParameters($true))
+
+        # Sign the JWT
+        $signatureInput = "$base64Header.$base64Payload"
+        $signature = $rsa.SignData([Text.Encoding]::UTF8.GetBytes($signatureInput), 'SHA256')
+        $base64Signature = [System.Convert]::ToBase64String($signature).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Create the JWT token
+        $jwtToken = "$($base64Header).$($base64Payload).$($base64Signature)"
+
+        $createEntraAccessTokenBody = @{
+            grant_type            = 'client_credentials'
+            client_id             = $AppId
+            client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+            client_assertion      = $jwtToken
+            resource              = 'https://graph.microsoft.com'
+        }
+
+        $createEntraAccessTokenSplatParams = @{
+            Uri         = "https://login.microsoftonline.com/$($TenantId)/oauth2/token"
+            Body        = $createEntraAccessTokenBody
+            Method      = 'POST'
+            ContentType = 'application/x-www-form-urlencoded'
+            Verbose     = $false
+            ErrorAction = 'Stop'
+        }
+
+        $createEntraAccessTokenResponse = Invoke-RestMethod @createEntraAccessTokenSplatParams
+        Write-Output $createEntraAccessTokenResponse.access_token
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+
+function Get-MSEntraCertificate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificateBase64String,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificatePassword
+    )
+    try {
+        $rawCertificate = [system.convert]::FromBase64String($CertificateBase64String)
+        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($rawCertificate, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+        Write-Output $certificate
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+#endregion functions
 
 try {
-    $userID = $datasource.selecteduser.ID
-    $userDisplayname = $datasource.selecteduser.displayname
-    $lifetimeHours = $datasource.lifetimeHours
-    $lifetimeMinutes = [int]$lifetimeHours * 60
-    $startdate = [System.DateTime]::Parse((Get-Date).DateTime)
-          
-    Write-Verbose "Generating Microsoft Graph API Access Token.."
-    $baseUri = "https://login.microsoftonline.com/"
-    $authUri = $baseUri + "$AADTenantID/oauth2/token"
-    $body = @{
-        grant_type    = "client_credentials"
-        client_id     = "$AADAppId"
-        client_secret = "$AADAppSecret"
-        resource      = "https://graph.microsoft.com"
-    }
+    # Convert base64 certificate string to certificate object
+    $actionMessage = "converting base64 certificate string to certificate object"
+    $certificate = Get-MSEntraCertificate -CertificateBase64String $EntraIdCertificateBase64String -CertificatePassword $EntraIdCertificatePassword
+    Write-Verbose "Converted base64 certificate string to certificate object"
 
-    $Response = Invoke-RestMethod -Method POST -Uri $authUri -Body $body -ContentType 'application/x-www-form-urlencoded'
-    $accessToken = $Response.access_token;
-    
-    #Add the authorization header to the request
-    $authorization = @{
-        Authorization  = "Bearer $accesstoken";
-        'Content-Type' = "application/json";
-        Accept         = "application/json";
-    }
+    # Create access token
+    $actionMessage = "creating access token"
+    $entraToken = Get-MSEntraAccessToken -Certificate $certificate -AppId $EntraIdAppId -TenantId $EntraIdTenantId
+    Write-Verbose "Created access token"
 
-    #create body for request
+    # Create headers
+    $actionMessage = "creating headers"
+    $headers = @{
+        "Authorization" = "Bearer $($entraToken)"
+        "Accept"        = "application/json"
+        "Content-Type"  = "application/json"
+    }
+    Write-Verbose "Created headers"
+
+    # Create body for Temporary Access Pass request
+    $actionMessage = "creating Temporary Access Pass request body"
     $body = @{
         startDateTime     = $startdate
         lifetimeInMinutes = $lifetimeMinutes
-        isUsableOnce      = $false
+        isUsableOnce      = $isUsableOnce
+    } | ConvertTo-Json -Depth 10
+    Write-Verbose "Created request body with lifetime of [$lifetimeMinutes] minutes"
+
+    # Generate Temporary Access Pass
+    # API docs: https://learn.microsoft.com/en-us/graph/api/authentication-post-temporaryaccesspassmethods?view=graph-rest-1.0&tabs=http
+    $actionMessage = "generating Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$lifetimeMinutes] minutes"
+    $generateTAPSplatParams = @{
+        Uri         = "https://graph.microsoft.com/v1.0/users/$userID/authentication/temporaryAccessPassMethods"
+        Headers     = $headers
+        Method      = "POST"
+        Body        = $body
+        Verbose     = $false
+        ErrorAction = "Stop"
     }
 
-    #building params voor request
-    $params = @{
-        uri     = "https://graph.microsoft.com/v1.0/users/$userID/authentication/temporaryAccessPassMethods"
-        Method  = "POST"
-        Headers = $authorization
-        Verbose = $false
-        body    = $body | convertto-json -depth 10
-    }
-
-    $result = Invoke-RestMethod @params
+    $result = Invoke-RestMethod @generateTAPSplatParams
+    Write-Information "Successfully generated Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$($result.lifetimeInMinutes)] minutes. [isUsableOnce] set to [$isUsableOnce]"
 
     $Log = @{
         Action            = "SetPassword" # optional. ENUM (undefined = default) 
-        System            = "AzureActiveDirectory" # optional (free format text) 
-        Message           = "Successfully generated Temporary Access Pass with lifetime $($result.lifetimeInMinutes) minutes" # required (free format text) 
+        System            = "EntraID" # optional (free format text) 
+        Message           = "Successfully generated Temporary Access Pass with lifetime [$($result.lifetimeInMinutes)] minutes. [isUsableOnce] set to [$isUsableOnce]" # required (free format text) 
         IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
         TargetDisplayName = $userDisplayname # optional (free format text) 
         TargetIdentifier  = $userID # optional (free format text) 
     }
 
-    #send result back  
+    # Send result back  
     Write-Information -Tags "Audit" -MessageData $log
 
-    #create output result
-    $output = $result | Select-Object -Property id, isUsable, temporaryAccessPass, lifetimeInMinutes, startDateTime, methodUsabilityReason, @{name = "lifetimeInHours"; Expression = { ($_.lifetimeInMinutes / 60) } }
-    return $output
-
+    # Send results to HelloID
+    $actionMessage = "sending results to HelloID"
+    $result | Select-Object -Property $propertiesToSelect | ForEach-Object {
+        Write-Output $_
+    }
 }
 catch {
-     
-    $errorDetailsMessage = ($_.ErrorDetails.Message | ConvertFrom-Json).error.message
-    Write-Error ("Error Temporary Access Pass. Error: $_" + $errorDetailsMessage)
-    
-    #return error in output    
-    $output = @{temporaryAccessPass = "Error: $errorDetailsMessage" }
-    return $output
+    $ex = $PSItem
+    if ($($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or
+        $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
+        $errorObj = Resolve-MicrosoftGraphAPIError -ErrorObject $ex
+        $auditMessage = "Error $($actionMessage). Error: $($errorObj.FriendlyMessage)"
+        $warningMessage = "Error at Line [$($errorObj.ScriptLineNumber)]: $($errorObj.Line). Error: $($errorObj.ErrorDetails)"
+        
+        # Check for specific Temporary Access Pass policy error
+        if ($auditMessage -like "*UserCredentialPolicy does not allow*TemporaryAccessPass*") {
+            $auditMessage = "Error $($actionMessage). Temporary Access Pass is not enabled in the Entra ID Authentication Methods Policy. Please enable it in Entra ID Admin Center > Protection > Authentication methods > Temporary Access Pass. Error: $($errorObj.FriendlyMessage)"
+        }
+    }
+    else {
+        $auditMessage = "Error $($actionMessage). Error: $($ex.Exception.Message)"
+        $warningMessage = "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
+    }
+
+    $Log = @{
+        Action            = "SetPassword" # optional. ENUM (undefined = default) 
+        System            = "EntraID" # optional (free format text) 
+        Message           = $auditMessage # required (free format text) 
+        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
+        TargetDisplayName = $userDisplayname # optional (free format text) 
+        TargetIdentifier  = $userID # optional (free format text) 
+    }
+    Write-Information -Tags "Audit" -MessageData $log
+    Write-Warning $warningMessage
+    Write-Error $auditMessage
+
+    # Return error in output
+    $errorMessage = if ($null -ne $errorObj) { $errorObj.FriendlyMessage } else { $ex.Exception.Message }
+    $output = @{
+        temporaryAccessPass = "Error: $errorMessage"
+    }
+    Write-Output $output
 }
-  
 '@ 
 $tmpModel = @'
-[{"key":"id","type":0},{"key":"isUsable","type":0},{"key":"temporaryAccessPass","type":0},{"key":"lifetimeInMinutes","type":0},{"key":"startDateTime","type":0},{"key":"methodUsabilityReason","type":0},{"key":"lifetimeInHours","type":0}]
+[{"key":"id","type":0},{"key":"isUsable","type":0},{"key":"isUsableOnce","type":0},{"key":"temporaryAccessPass","type":0},{"key":"lifetimeInMinutes","type":0},{"key":"createdDateTime","type":0},{"key":"startDateTime","type":0},{"key":"methodUsabilityReason","type":0}]
 '@ 
 $tmpInput = @'
-[{"description":null,"translateDescription":false,"inputFieldType":1,"key":"selectedUser","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"lifeTimeHours","type":0,"options":1}]
+[{"description":null,"translateDescription":false,"inputFieldType":1,"key":"selectedUser","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"lifetimeMinutes","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"isUsableOnce","type":0,"options":0}]
 '@ 
 $dataSourceGuid_1 = [PSCustomObject]@{} 
 $dataSourceGuid_1_Name = @'
-Azure-AD-temp-access-pass-create-access-pass
+Entra ID - Temporary Access Pass - Create | EntraID-Temp-Access-Pass-Create-Access-Pass
 '@ 
-Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_1) 
-<# End: DataSource "Azure-AD-temp-access-pass-create-access-pass" #>
+Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -DataSourceRunInCloud "True" -returnObject ([Ref]$dataSourceGuid_1) 
+<# End: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Temp-Access-Pass-Create-Access-Pass" #>
 
-<# Begin: DataSource "Azure-AD-temp-access-pass-generate-user-table-wildcard" #>
+<# Begin: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Get-Users-Wildcard-DisplayName-UPN-Mail" #>
 $tmpPsScript = @'
-# Set TLS to accept TLS, TLS 1.1 and TLS 1.2
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
+# Variables configured in form
+$searchValue = $datasource.searchValue
+if ($searchValue -eq "*") {
+    $filter = "`$filter=displayName ne null" # Get all users
+}
+else {
+    $filter = "`$search=`"displayName:$searchValue`" OR `"userPrincipalName:$searchValue`" OR `"mail:$searchValue`""
+}
+
+# Global variables
+# Outcommented as these are set from Global Variables
+# $EntraIdTenantId = ""
+# $EntraIdAppId = ""
+# $EntraIdCertificateBase64String = ""
+# $EntraIdCertificatePassword = ""
+
+# Fixed values
+$propertiesToSelect = @(
+    "id",
+    "userPrincipalName",
+    "displayName",
+    "mail",
+    "description",
+    "department",
+    "jobTitle",
+    "companyName",
+    "accountEnabled"
+) # Properties to select from Microsoft Graph API, comma separated
+
+# Enable TLS1.2
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+
+# Set debug logging
+$VerbosePreference = "SilentlyContinue"
+$InformationPreference = "Continue"
+$WarningPreference = "Continue"
+
+#region functions
+function Resolve-MicrosoftGraphAPIError {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [object]
+        $ErrorObject
+    )
+    process {
+        $httpErrorObj = [PSCustomObject]@{
+            ScriptLineNumber = $ErrorObject.InvocationInfo.ScriptLineNumber
+            Line             = $ErrorObject.InvocationInfo.Line
+            ErrorDetails     = $ErrorObject.Exception.Message
+            FriendlyMessage  = $ErrorObject.Exception.Message
+        }
+        if (-not [string]::IsNullOrEmpty($ErrorObject.ErrorDetails.Message)) {
+            $httpErrorObj.ErrorDetails = $ErrorObject.ErrorDetails.Message
+        }
+        elseif ($ErrorObject.Exception.GetType().FullName -eq 'System.Net.WebException') {
+            if ($null -ne $ErrorObject.Exception.Response) {
+                $streamReaderResponse = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()
+                if (-not [string]::IsNullOrEmpty($streamReaderResponse)) {
+                    $httpErrorObj.ErrorDetails = $streamReaderResponse
+                }
+            }
+        }
+        try {
+            $errorDetailsObject = ($httpErrorObj.ErrorDetails | ConvertFrom-Json -ErrorAction Stop)
+            if ($errorDetailsObject.error_description) {
+                $httpErrorObj.FriendlyMessage = $errorDetailsObject.error_description
+            }
+            elseif ($errorDetailsObject.error.message) {
+                $httpErrorObj.FriendlyMessage = "$($errorDetailsObject.error.code): $($errorDetailsObject.error.message)"
+            }
+            elseif ($errorDetailsObject.error.details.message) {
+                $httpErrorObj.FriendlyMessage = "$($errorDetailsObject.error.details.code): $($errorDetailsObject.error.details.message)"
+            }
+            else {
+                $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails
+            }
+        }
+        catch {
+            $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails
+        }
+        Write-Output $httpErrorObj
+    }
+}
+
+function Get-MSEntraAccessToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        $Certificate,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $AppId,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $TenantId
+    )
+    try {
+        # Get the DER encoded bytes of the certificate
+        $derBytes = $Certificate.RawData
+
+        # Compute the SHA-256 hash of the DER encoded bytes
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        $hashBytes = $sha256.ComputeHash($derBytes)
+        $base64Thumbprint = [System.Convert]::ToBase64String($hashBytes).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Create a JWT (JSON Web Token) header
+        $header = @{
+            'alg'      = 'RS256'
+            'typ'      = 'JWT'
+            'x5t#S256' = $base64Thumbprint
+        } | ConvertTo-Json
+        $base64Header = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($header))
+
+        # Calculate the Unix timestamp (seconds since 1970-01-01T00:00:00Z) for 'exp', 'nbf' and 'iat'
+        $currentUnixTimestamp = [math]::Round(((Get-Date).ToUniversalTime() - ([datetime]'1970-01-01T00:00:00Z').ToUniversalTime()).TotalSeconds)
+
+        # Create a JWT payload
+        $payload = [Ordered]@{
+            'iss' = "$($AppId)"
+            'sub' = "$($AppId)"
+            'aud' = "https://login.microsoftonline.com/$($TenantId)/oauth2/token"
+            'exp' = ($currentUnixTimestamp + 3600) # Expires in 1 hour
+            'nbf' = ($currentUnixTimestamp - 300) # Not before 5 minutes ago
+            'iat' = $currentUnixTimestamp
+            'jti' = [Guid]::NewGuid().ToString()
+        } | ConvertTo-Json
+        $base64Payload = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($payload)).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Extract the private key from the certificate
+        $rsaPrivate = $Certificate.PrivateKey
+        $rsa = [System.Security.Cryptography.RSACryptoServiceProvider]::new()
+        $rsa.ImportParameters($rsaPrivate.ExportParameters($true))
+
+        # Sign the JWT
+        $signatureInput = "$base64Header.$base64Payload"
+        $signature = $rsa.SignData([Text.Encoding]::UTF8.GetBytes($signatureInput), 'SHA256')
+        $base64Signature = [System.Convert]::ToBase64String($signature).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Ensure the certificate has a private key
+        if (-not $Certificate.HasPrivateKey -or -not $Certificate.PrivateKey) {
+            throw "The certificate does not have a private key."
+        }
+
+        # Create the JWT token
+        $jwtToken = "$($base64Header).$($base64Payload).$($base64Signature)"
+
+        $createEntraAccessTokenBody = @{
+            grant_type            = 'client_credentials'
+            client_id             = $AppId
+            client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+            client_assertion      = $jwtToken
+            resource              = 'https://graph.microsoft.com'
+        }
+
+        $createEntraAccessTokenSplatParams = @{
+            Uri         = "https://login.microsoftonline.com/$($TenantId)/oauth2/token"
+            Body        = $createEntraAccessTokenBody
+            Method      = 'POST'
+            ContentType = 'application/x-www-form-urlencoded'
+            Verbose     = $false
+            ErrorAction = 'Stop'
+        }
+
+        $createEntraAccessTokenResponse = Invoke-RestMethod @createEntraAccessTokenSplatParams
+        Write-Output $createEntraAccessTokenResponse.access_token
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+
+function Get-MSEntraCertificate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificateBase64String,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificatePassword
+    )
+    try {
+        $rawCertificate = [system.convert]::FromBase64String($CertificateBase64String)
+        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($rawCertificate, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+        Write-Output $certificate
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+#endregion functions
 
 try {
-    $searchValue = $datasource.searchUser
-    $searchQuery = "*$searchValue*"
-          
-    Write-Verbose "Generating Microsoft Graph API Access Token.."
-    $baseUri = "https://login.microsoftonline.com/"
-    $authUri = $baseUri + "$AADTenantID/oauth2/token"
-    $body = @{
-        grant_type      = "client_credentials"
-        client_id       = "$AADAppId"
-        client_secret   = "$AADAppSecret"
-        resource        = "https://graph.microsoft.com"
+    # Convert base64 certificate string to certificate object
+    $actionMessage = "converting base64 certificate string to certificate object"
+    $certificate = Get-MSEntraCertificate -CertificateBase64String $EntraIdCertificateBase64String -CertificatePassword $EntraIdCertificatePassword
+
+    # Create access token
+    $actionMessage = "creating access token"
+    $entraToken = Get-MSEntraAccessToken -Certificate $certificate -AppId $EntraIdAppId -TenantId $EntraIdTenantId
+
+    # Create headers
+    $actionMessage = "creating headers"
+    $headers = @{
+        "Authorization"    = "Bearer $($entraToken)"
+        "Accept"           = "application/json"
+        "Content-Type"     = "application/json"
+        "ConsistencyLevel" = "eventual" # Needed to filter on specific attributes (https://docs.microsoft.com/en-us/graph/aad-advanced-queries)
     }
 
-    $Response = Invoke-RestMethod -Method POST -Uri $authUri -Body $body -ContentType 'application/x-www-form-urlencoded'
-    $accessToken = $Response.access_token;
-    Write-Information "Searching for: $searchQuery"
-    
-    #Add the authorization header to the request
-    $authorization = @{
-        Authorization = "Bearer $accesstoken";
-        'Content-Type' = "application/json";
-        Accept = "application/json";
-    }
-
-    $baseSearchUri = "https://graph.microsoft.com/"
-    $searchUri = $baseSearchUri + "v1.0/users" + '?$select=Id,UserPrincipalName,displayName,department,jobTitle,companyName' + '&$top=999'
-
-    $azureADUsersResponse = Invoke-RestMethod -Uri $searchUri -Method Get -Headers $authorization -Verbose:$false
-    $azureADUsers = $azureADUsersResponse.value
-    while (![string]::IsNullOrEmpty($azureADUsersResponse.'@odata.nextLink')) {
-        $azureADUsersResponse = Invoke-RestMethod -Uri $azureADUsersResponse.'@odata.nextLink' -Method Get -Headers $authorization -Verbose:$false
-        $azureADUsers += $azureADUsersResponse.value
-    }  
-
-    $users = foreach($azureADUser in $azureADUsers){
-        if($azureADUser.displayName -like $searchQuery -or $azureADUser.userPrincipalName -like $searchQuery){
-            $azureADUser
+    # Get Microsoft Entra ID Users
+    # API docs: https://learn.microsoft.com/en-us/graph/api/user-list?view=graph-rest-1.0&tabs=http
+    $actionMessage = "querying Microsoft Entra ID Users matching filter [$filter]"
+    $microsoftEntraIDUsers = [System.Collections.ArrayList]@()
+    do {
+        $getMicrosoftEntraIDUsersSplatParams = @{
+            Uri         = "https://graph.microsoft.com/v1.0/users?$filter&`$select=$($propertiesToSelect -join ',')&`$top=999&`$count=true"
+            Headers     = $headers
+            Method      = "GET"
+            Verbose     = $false
+            ErrorAction = "Stop"
         }
-    }
-    $users = $users | Sort-Object -Property DisplayName
-    $resultCount = @($users).Count
-    Write-Information "Result count: $resultCount"
+        if (-not[string]::IsNullOrEmpty($getMicrosoftEntraIDUsersResponse.'@odata.nextLink')) {
+            $getMicrosoftEntraIDUsersSplatParams["Uri"] = $getMicrosoftEntraIDUsersResponse.'@odata.nextLink'
+        }
         
-    if($resultCount -gt 0){
-        foreach($user in $users){
-            $returnObject = @{
-                Id=$user.Id;
-                UserPrincipalName=$user.UserPrincipalName;
-                DisplayName=$user.DisplayName;
-                Department=$user.Department;
-                Title=$user.JobTitle;
-                Company=$user.CompanyName
-            }
-            Write-Output $returnObject
+        $getMicrosoftEntraIDUsersResponse = $null
+        $getMicrosoftEntraIDUsersResponse = Invoke-RestMethod @getMicrosoftEntraIDUsersSplatParams
+    
+        # Select only specified properties to limit memory usage
+        $getMicrosoftEntraIDUsersResponse.Value = $getMicrosoftEntraIDUsersResponse.Value | Select-Object $propertiesToSelect
+
+        if ($getMicrosoftEntraIDUsersResponse.Value -is [array]) {
+            [void]$microsoftEntraIDUsers.AddRange($getMicrosoftEntraIDUsersResponse.Value)
         }
+        else {
+            [void]$microsoftEntraIDUsers.Add($getMicrosoftEntraIDUsersResponse.Value)
+        }
+    } while (-not[string]::IsNullOrEmpty($getMicrosoftEntraIDUsersResponse.'@odata.nextLink'))
+    Write-Information "Queried Microsoft Entra ID Users matching filter [$filter]. Result count: $(@($microsoftEntraIDUsers).Count)"
+
+    # Send results to HelloID
+    $actionMessage = "sending results to HelloID"
+    $microsoftEntraIDUsers | ForEach-Object {
+        Write-Output $_
     }
-} catch {
-    $errorDetailsMessage = ($_.ErrorDetails.Message | ConvertFrom-Json).error.message
-    Write-Error ("Error searching for AzureAD users. Error: $_" + $errorDetailsMessage)
+}
+catch {
+    $ex = $PSItem
+    if ($($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or
+        $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
+        $errorObj = Resolve-MicrosoftGraphAPIError -ErrorObject $ex
+        $auditMessage = "Error $($actionMessage). Error: $($errorObj.FriendlyMessage)"
+        $warningMessage = "Error at Line [$($errorObj.ScriptLineNumber)]: $($errorObj.Line). Error: $($errorObj.ErrorDetails)"
+    }
+    else {
+        $auditMessage = "Error $($actionMessage). Error: $($ex.Exception.Message)"
+        $warningMessage = "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
+    }
+    Write-Warning $warningMessage
+    Write-Error $auditMessage
 }
   
 '@ 
 $tmpModel = @'
-[{"key":"Title","type":0},{"key":"department","type":0},{"key":"Company","type":0},{"key":"displayName","type":0},{"key":"Id","type":0},{"key":"UserPrincipalName","type":0}]
+[{"key":"id","type":0},{"key":"userPrincipalName","type":0},{"key":"displayName","type":0},{"key":"mail","type":0},{"key":"description","type":0},{"key":"department","type":0},{"key":"jobTitle","type":0},{"key":"companyName","type":0},{"key":"accountEnabled","type":0}]
 '@ 
 $tmpInput = @'
-[{"description":"","translateDescription":false,"inputFieldType":1,"key":"searchUser","type":0,"options":1}]
+[{"description":"","translateDescription":false,"inputFieldType":1,"key":"searchValue","type":0,"options":1}]
 '@ 
 $dataSourceGuid_0 = [PSCustomObject]@{} 
 $dataSourceGuid_0_Name = @'
-Azure-AD-temp-access-pass-generate-user-table-wildcard
+Entra ID - Temporary Access Pass - Create | EntraID-Get-Users-Wildcard-DisplayName-UPN-Mail
 '@ 
-Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_0) 
-<# End: DataSource "Azure-AD-temp-access-pass-generate-user-table-wildcard" #>
+Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -DataSourceRunInCloud "True" -returnObject ([Ref]$dataSourceGuid_0) 
+<# End: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Get-Users-Wildcard-DisplayName-UPN-Mail" #>
 <# End: HelloID Data sources #>
 
-<# Begin: Dynamic Form "AzureAD - Temporary Access Pass" #>
+<# Begin: Dynamic Form "Entra ID - Temporary Access Pass - Create" #>
 $tmpSchema = @"
-[{"label":"Select user account","fields":[{"key":"searchfield","templateOptions":{"label":"Search","placeholder":"Username or email address"},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridUsers","templateOptions":{"label":"Select user","required":true,"grid":{"columns":[{"headerName":"Display Name","field":"DisplayName"},{"headerName":"User Principal Name","field":"UserPrincipalName"},{"headerName":"Title","field":"Title"},{"headerName":"Department","field":"Department"},{"headerName":"Company","field":"Company"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchUser","otherFieldValue":{"otherFieldKey":"searchfield"}}]}}},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"create Access Pass","fields":[{"key":"selecteduser","templateOptions":{"label":"Selected User"},"fieldGroup":[{"key":"Displayname","templateOptions":{"label":"Display name","useDependOn":true,"dependOn":"gridUsers","dependOnProperty":"DisplayName","readonly":true},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"UserPrincipalName","templateOptions":{"label":"UserPrincipalName","readonly":true,"useDependOn":true,"dependOn":"gridUsers","dependOnProperty":"UserPrincipalName"},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}],"type":"formrow","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"lifteTimeHours","templateOptions":{"label":"lifetime (hours)","max":12,"min":1},"type":"number","defaultValue":"10","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"temporaryAccessPass","templateOptions":{"label":"Create Temporary Access Pass Now","useSwitch":true,"checkboxLabel":"Yes"},"type":"boolean","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"tempAccessPass","templateOptions":{"label":"Temporary Access Pass","required":false,"grid":{"columns":[{"headerName":"Temporary Access Pass","field":"temporaryAccessPass"},{"headerName":"Lifetime In Hours","field":"lifetimeInHours"},{"headerName":"Start Date","field":"startDateTime"}],"height":200,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[{"propertyName":"selectedUser","otherFieldValue":{"otherFieldKey":"gridUsers"}},{"propertyName":"lifeTimeHours","otherFieldValue":{"otherFieldKey":"lifteTimeHours"}}]}},"useFilter":true,"useDefault":false,"searchPlaceHolder":"Search this data"},"hideExpression":"!model[\"temporaryAccessPass\"]","type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]}]
+[{"label":"Select user account","fields":[{"key":"searchfield","templateOptions":{"label":"Search field (wildcard search in Display name, UserPrincipalName and mail)","placeholder":"Display name, UserPrincipalName, or mail (use * to search all users)","required":true,"minLength":1},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridUsers","templateOptions":{"label":"Select user","required":true,"grid":{"columns":[{"headerName":"Display Name","field":"displayName"},{"headerName":"User Principal Name","field":"userPrincipalName"},{"headerName":"Mail","field":"mail"},{"headerName":"Description","field":"description"},{"headerName":"Account Enabled","field":"accountEnabled"},{"headerName":"Job Title","field":"jobTitle"},{"headerName":"Department","field":"department"},{"headerName":"Company Name","field":"companyName"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchValue","otherFieldValue":{"otherFieldKey":"searchfield"}}]}},"allowCsvDownload":true,"useFilter":true},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"Create TAP","fields":[{"key":"selecteduser","templateOptions":{"label":"Selected User"},"fieldGroup":[{"key":"Displayname","templateOptions":{"label":"Display name","useDependOn":true,"dependOn":"gridUsers","dependOnProperty":"displayName","readonly":true},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"UserPrincipalName","templateOptions":{"label":"UserPrincipalName","readonly":true,"useDependOn":true,"dependOn":"gridUsers","dependOnProperty":"userPrincipalName"},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}],"type":"formrow","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"lifteTimeMinutes","templateOptions":{"label":"lifetime (minutes)","min":1,"required":true},"type":"number","defaultValue":"60","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"isUsableOnce","templateOptions":{"label":"Is Usable Once","useSwitch":true,"checkboxLabel":"Yes"},"type":"boolean","defaultValue":true,"summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"temporaryAccessPass","templateOptions":{"label":"Create Temporary Access Pass Now","useSwitch":true,"checkboxLabel":"Yes"},"type":"boolean","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"tempAccessPass","templateOptions":{"label":"Temporary Access Pass","required":true,"grid":{"columns":[{"headerName":"Temporary Access Pass","field":"temporaryAccessPass"},{"headerName":"Is Usable","field":"isUsable"},{"headerName":"Is Usable Once","field":"isUsableOnce"},{"headerName":"Lifetime In Minutes","field":"lifetimeInMinutes"},{"headerName":"Method Usability Reason","field":"methodUsabilityReason"},{"headerName":"Start Date Time","field":"startDateTime"},{"headerName":"Created Date Time","field":"createdDateTime"}],"height":200,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[{"propertyName":"selectedUser","otherFieldValue":{"otherFieldKey":"gridUsers"}},{"propertyName":"lifetimeMinutes","otherFieldValue":{"otherFieldKey":"lifteTimeMinutes"}},{"propertyName":"isUsableOnce","otherFieldValue":{"otherFieldKey":"isUsableOnce"}}]}},"useFilter":true,"useDefault":true,"searchPlaceHolder":"Search this data","allowCsvDownload":true,"defaultSelectorProperty":"temporaryAccessPass"},"hideExpression":"!model[\"temporaryAccessPass\"]","type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]}]
 "@ 
 
 $dynamicFormGuid = [PSCustomObject]@{} 
 $dynamicFormName = @'
-AzureAD - Temporary Access Pass
+Entra ID - Temporary Access Pass - Create
 '@ 
 Invoke-HelloIDDynamicForm -FormName $dynamicFormName -FormSchema $tmpSchema  -returnObject ([Ref]$dynamicFormGuid) 
 <# END: Dynamic Form #>
@@ -546,7 +959,7 @@ if(-not[String]::IsNullOrEmpty($delegatedFormAccessGroupNames)){
             $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
             $delegatedFormAccessGroupGuid = $response.groupGuid
             $delegatedFormAccessGroupGuids += $delegatedFormAccessGroupGuid
-            
+        
             Write-Information "HelloID (access)group '$group' successfully found$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormAccessGroupGuid })"
         } catch {
             Write-Error "HelloID (access)group '$group', message: $_"
@@ -563,10 +976,10 @@ foreach($category in $delegatedFormCategories) {
         $uri = ($script:PortalBaseUrl +"api/v1/delegatedformcategories/$category")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
         $response = $response | Where-Object {$_.name.en -eq $category}
-        
+    
         $tmpGuid = $response.delegatedFormCategoryGuid
         $delegatedFormCategoryGuids += $tmpGuid
-        
+    
         Write-Information "HelloID Delegated Form category '$category' successfully found$(if ($script:debugLogging -eq $true) { ": " + $tmpGuid })"
     } catch {
         Write-Warning "HelloID Delegated Form category '$category' not found"
@@ -589,9 +1002,10 @@ $delegatedFormCategoryGuids = (ConvertTo-Json -InputObject $delegatedFormCategor
 <# Begin: Delegated Form #>
 $delegatedFormRef = [PSCustomObject]@{guid = $null; created = $null} 
 $delegatedFormName = @'
-Azure AD - Temporary Access Pass
+Entra ID - Temporary Access Pass - Create
 '@
 $tmpTask = @'
+{"name":"Entra ID - Temporary Access Pass - Create","script":"# Variables configured in form\r\n$user = $form.gridUsers\r\n$lifetimeMinutes = $form.tempAccessPass.lifetimeInMinutes\r\n$startDateTime = $form.tempAccessPass.startDateTime\r\n$isUsableOnce = $form.tempAccessPass.isUsableOnce\r\n\r\n# Set debug logging\r\n$VerbosePreference = \"SilentlyContinue\"\r\n$InformationPreference = \"Continue\"\r\n$WarningPreference = \"Continue\"\r\n\r\ntry {\r\n    # Create audit log for Temporary Access Pass generation\r\n    # Note: The TAP is already generated in the datasource/form, this task only creates the audit log\r\n    # Security: The TAP value itself is NOT logged for security reasons\r\n    $Log = @{\r\n        Action            = \"SetPassword\" # optional. ENUM (undefined = default) \r\n        System            = \"EntraID\" # optional (free format text) \r\n        Message           = \"Successfully generated Temporary Access Pass for user [$($user.displayName)] with id [$($user.id)]. Lifetime: [$lifetimeMinutes] minutes ([$([math]::Round($lifetimeMinutes / 60, 2))] hours), Start: [$startDateTime], Usable once: [$isUsableOnce]\" # required (free format text) \r\n        IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n        TargetDisplayName = $user.displayName # optional (free format text)\r\n        TargetIdentifier  = $user.id # optional (free format text)\r\n    }\r\n    #send result back  \r\n    Write-Information -Tags \"Audit\" -MessageData $log\r\n\r\n}\r\ncatch {\r\n    $ex = $PSItem\r\n    $auditMessage = \"Error creating audit log for Temporary Access Pass generation for user [$($user.displayName)] with id [$($user.id)]. Error: $($ex.Exception.Message)\"\r\n    $warningMessage = \"Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)\"\r\n\r\n    $Log = @{\r\n        Action            = \"SetPassword\" # optional. ENUM (undefined = default) \r\n        System            = \"EntraID\" # optional (free format text)\r\n        Message           = $auditMessage # required (free format text) \r\n        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n        TargetDisplayName = $user.displayName # optional (free format text)\r\n        TargetIdentifier  = $user.id # optional (free format text)\r\n    }\r\n    Write-Information -Tags \"Audit\" -MessageData $log\r\n    Write-Warning $warningMessage\r\n    Write-Error $auditMessage\r\n}","runInCloud":true}
 '@ 
 
 Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-key" -task $tmpTask -returnObject ([Ref]$delegatedFormRef) 
