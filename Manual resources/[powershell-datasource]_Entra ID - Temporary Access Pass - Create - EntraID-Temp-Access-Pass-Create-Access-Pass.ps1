@@ -2,7 +2,7 @@
 $userID = $datasource.selecteduser.ID
 $userDisplayname = $datasource.selecteduser.displayname
 $lifetimeMinutes = [int]$datasource.lifetimeMinutes
-$isUsableOnce = [int]$datasource.isUsableOnce
+$isUsableOnce = if($datasource.isUsableOnce -eq 'true') {$true} else {$false}
 $startdate = [System.DateTime]::Parse((Get-Date).DateTime)
 
 # Global variables
@@ -216,7 +216,7 @@ try {
     $body = @{
         startDateTime     = $startdate
         lifetimeInMinutes = $lifetimeMinutes
-        isUsableOnce      = $true
+        isUsableOnce      = $isUsableOnce
     } | ConvertTo-Json -Depth 10
     Write-Verbose "Created request body with lifetime of [$lifetimeMinutes] minutes"
 
@@ -233,12 +233,12 @@ try {
     }
 
     $result = Invoke-RestMethod @generateTAPSplatParams
-    Write-Information "Successfully generated Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$($result.lifetimeInMinutes)] minutes"
+    Write-Information "Successfully generated Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$($result.lifetimeInMinutes)] minutes. [isUsableOnce] set to [$isUsableOnce]"
 
     $Log = @{
         Action            = "SetPassword" # optional. ENUM (undefined = default) 
         System            = "EntraID" # optional (free format text) 
-        Message           = "Successfully generated Temporary Access Pass with lifetime [$($result.lifetimeInMinutes)] minutes" # required (free format text) 
+        Message           = "Successfully generated Temporary Access Pass with lifetime [$($result.lifetimeInMinutes)] minutes. [isUsableOnce] set to [$isUsableOnce]" # required (free format text) 
         IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
         TargetDisplayName = $userDisplayname # optional (free format text) 
         TargetIdentifier  = $userID # optional (free format text) 

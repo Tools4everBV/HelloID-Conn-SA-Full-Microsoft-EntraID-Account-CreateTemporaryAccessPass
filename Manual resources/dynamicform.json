@@ -1,251 +1,251 @@
 [
-    {
-        "label":  "Select user account",
-        "fields":  [
-                       {
-                           "key":  "searchfield",
-                           "templateOptions":  {
-                                                   "label":  "Search field (wildcard search in Display name, UserPrincipalName and mail)",
-                                                   "placeholder":  "Display name, UserPrincipalName, or mail (use * to search all users)",
-                                                   "required":  true,
-                                                   "minLength":  1
-                                               },
-                           "type":  "input",
-                           "summaryVisibility":  "Hide element",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "gridUsers",
-                           "templateOptions":  {
-                                                   "label":  "Select user",
-                                                   "required":  true,
-                                                   "grid":  {
-                                                                "columns":  [
-                                                                                {
-                                                                                    "headerName":  "Display Name",
-                                                                                    "field":  "displayName"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "User Principal Name",
-                                                                                    "field":  "userPrincipalName"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Mail",
-                                                                                    "field":  "mail"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Description",
-                                                                                    "field":  "description"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Account Enabled",
-                                                                                    "field":  "accountEnabled"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Job Title",
-                                                                                    "field":  "jobTitle"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Department",
-                                                                                    "field":  "department"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Company Name",
-                                                                                    "field":  "companyName"
-                                                                                }
-                                                                            ],
-                                                                "height":  300,
-                                                                "rowSelection":  "single"
-                                                            },
-                                                   "dataSourceConfig":  {
-                                                                            "dataSourceGuid":  "$dataSourceGuid_0",
-                                                                            "input":  {
-                                                                                          "propertyInputs":  [
-                                                                                                                 {
-                                                                                                                     "propertyName":  "searchValue",
-                                                                                                                     "otherFieldValue":  {
-                                                                                                                                             "otherFieldKey":  "searchfield"
-                                                                                                                                         }
-                                                                                                                 }
-                                                                                                             ]
-                                                                                      }
-                                                                        },
-                                                   "allowCsvDownload":  true,
-                                                   "useFilter":  true
-                                               },
-                           "type":  "grid",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  true
-                       }
-                   ]
-    },
-    {
-        "label":  "Create TAP",
-        "fields":  [
-                       {
-                           "key":  "selecteduser",
-                           "templateOptions":  {
-                                                   "label":  "Selected User"
-                                               },
-                           "fieldGroup":  [
-                                              {
-                                                  "key":  "Displayname",
-                                                  "templateOptions":  {
-                                                                          "label":  "Display name",
-                                                                          "useDependOn":  true,
-                                                                          "dependOn":  "gridUsers",
-                                                                          "dependOnProperty":  "displayName",
-                                                                          "readonly":  true
-                                                                      },
-                                                  "type":  "input",
-                                                  "summaryVisibility":  "Hide element",
-                                                  "requiresTemplateOptions":  true,
-                                                  "requiresKey":  true,
-                                                  "requiresDataSource":  false
-                                              },
-                                              {
-                                                  "key":  "UserPrincipalName",
-                                                  "templateOptions":  {
-                                                                          "label":  "UserPrincipalName",
-                                                                          "readonly":  true,
-                                                                          "useDependOn":  true,
-                                                                          "dependOn":  "gridUsers",
-                                                                          "dependOnProperty":  "userPrincipalName"
-                                                                      },
-                                                  "type":  "input",
-                                                  "summaryVisibility":  "Hide element",
-                                                  "requiresTemplateOptions":  true,
-                                                  "requiresKey":  true,
-                                                  "requiresDataSource":  false
-                                              }
-                                          ],
-                           "type":  "formrow",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "lifteTimeMinutes",
-                           "templateOptions":  {
-                                                   "label":  "lifetime (minutes)",
-                                                   "min":  1,
-                                                   "required":  true
-                                               },
-                           "type":  "number",
-                           "defaultValue":  "60",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "isUsableOnce",
-                           "templateOptions":  {
-                                                   "label":  "Is Usable Once",
-                                                   "useSwitch":  true,
-                                                   "checkboxLabel":  "Yes"
-                                               },
-                           "type":  "boolean",
-                           "defaultValue":  true,
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "temporaryAccessPass",
-                           "templateOptions":  {
-                                                   "label":  "Create Temporary Access Pass Now",
-                                                   "useSwitch":  true,
-                                                   "checkboxLabel":  "Yes"
-                                               },
-                           "type":  "boolean",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "tempAccessPass",
-                           "templateOptions":  {
-                                                   "label":  "Temporary Access Pass",
-                                                   "required":  true,
-                                                   "grid":  {
-                                                                "columns":  [
-                                                                                {
-                                                                                    "headerName":  "Temporary Access Pass",
-                                                                                    "field":  "temporaryAccessPass"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Is Usable",
-                                                                                    "field":  "isUsable"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Is Usable Once",
-                                                                                    "field":  "isUsableOnce"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Lifetime In Minutes",
-                                                                                    "field":  "lifetimeInMinutes"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Method Usability Reason",
-                                                                                    "field":  "methodUsabilityReason"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Start Date Time",
-                                                                                    "field":  "startDateTime"
-                                                                                },
-                                                                                {
-                                                                                    "headerName":  "Created Date Time",
-                                                                                    "field":  "createdDateTime"
-                                                                                }
-                                                                            ],
-                                                                "height":  200,
-                                                                "rowSelection":  "single"
-                                                            },
-                                                   "dataSourceConfig":  {
-                                                                            "dataSourceGuid":  "$dataSourceGuid_1",
-                                                                            "input":  {
-                                                                                          "propertyInputs":  [
-                                                                                                                 {
-                                                                                                                     "propertyName":  "selectedUser",
-                                                                                                                     "otherFieldValue":  {
-                                                                                                                                             "otherFieldKey":  "gridUsers"
-                                                                                                                                         }
-                                                                                                                 },
-                                                                                                                 {
-                                                                                                                     "propertyName":  "lifetimeMinutes",
-                                                                                                                     "otherFieldValue":  {
-                                                                                                                                             "otherFieldKey":  "lifteTimeMinutes"
-                                                                                                                                         }
-                                                                                                                 },
-                                                                                                                 {
-                                                                                                                     "propertyName":  "isUsableOnce",
-                                                                                                                     "otherFieldValue":  {
-                                                                                                                                             "otherFieldKey":  "isUsableOnce"
-                                                                                                                                         }
-                                                                                                                 }
-                                                                                                             ]
-                                                                                      }
-                                                                        },
-                                                   "useFilter":  true,
-                                                   "useDefault":  true,
-                                                   "searchPlaceHolder":  "Search this data",
-                                                   "allowCsvDownload":  true,
-                                                   "defaultSelectorProperty":  "temporaryAccessPass"
-                                               },
-                           "hideExpression":  "!model[\"temporaryAccessPass\"]",
-                           "type":  "grid",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  true
-                       }
-                   ]
-    }
+  {
+    "label": "Select user account",
+    "fields": [
+      {
+        "key": "searchfield",
+        "templateOptions": {
+          "label": "Search field (wildcard search in Display name, UserPrincipalName and mail)",
+          "placeholder": "Display name, UserPrincipalName, or mail (use * to search all users)",
+          "required": true,
+          "minLength": 1
+        },
+        "type": "input",
+        "summaryVisibility": "Hide element",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": false
+      },
+      {
+        "key": "gridUsers",
+        "templateOptions": {
+          "label": "Select user",
+          "required": true,
+          "grid": {
+            "columns": [
+              {
+                "headerName": "Display Name",
+                "field": "displayName"
+              },
+              {
+                "headerName": "User Principal Name",
+                "field": "userPrincipalName"
+              },
+              {
+                "headerName": "Mail",
+                "field": "mail"
+              },
+              {
+                "headerName": "Description",
+                "field": "description"
+              },
+              {
+                "headerName": "Account Enabled",
+                "field": "accountEnabled"
+              },
+              {
+                "headerName": "Job Title",
+                "field": "jobTitle"
+              },
+              {
+                "headerName": "Department",
+                "field": "department"
+              },
+              {
+                "headerName": "Company Name",
+                "field": "companyName"
+              }
+            ],
+            "height": 300,
+            "rowSelection": "single"
+          },
+          "dataSourceConfig": {
+            "dataSourceGuid": "$dataSourceGuid_0",
+            "input": {
+              "propertyInputs": [
+                {
+                  "propertyName": "searchValue",
+                  "otherFieldValue": {
+                    "otherFieldKey": "searchfield"
+                  }
+                }
+              ]
+            }
+          },
+          "allowCsvDownload": true,
+          "useFilter": true
+        },
+        "type": "grid",
+        "summaryVisibility": "Show",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": true
+      }
+    ]
+  },
+  {
+    "label": "Create TAP",
+    "fields": [
+      {
+        "key": "selecteduser",
+        "templateOptions": {
+          "label": "Selected User"
+        },
+        "fieldGroup": [
+          {
+            "key": "Displayname",
+            "templateOptions": {
+              "label": "Display name",
+              "useDependOn": true,
+              "dependOn": "gridUsers",
+              "dependOnProperty": "displayName",
+              "readonly": true
+            },
+            "type": "input",
+            "summaryVisibility": "Hide element",
+            "requiresTemplateOptions": true,
+            "requiresKey": true,
+            "requiresDataSource": false
+          },
+          {
+            "key": "UserPrincipalName",
+            "templateOptions": {
+              "label": "UserPrincipalName",
+              "readonly": true,
+              "useDependOn": true,
+              "dependOn": "gridUsers",
+              "dependOnProperty": "userPrincipalName"
+            },
+            "type": "input",
+            "summaryVisibility": "Hide element",
+            "requiresTemplateOptions": true,
+            "requiresKey": true,
+            "requiresDataSource": false
+          }
+        ],
+        "type": "formrow",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": false
+      },
+      {
+        "key": "lifteTimeMinutes",
+        "templateOptions": {
+          "label": "lifetime (minutes)",
+          "min": 1,
+          "required": true
+        },
+        "type": "number",
+        "defaultValue": "60",
+        "summaryVisibility": "Show",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": false
+      },
+      {
+        "key": "isUsableOnce",
+        "templateOptions": {
+          "label": "Is Usable Once",
+          "useSwitch": true,
+          "checkboxLabel": "Yes"
+        },
+        "type": "boolean",
+        "defaultValue": true,
+        "summaryVisibility": "Show",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": false
+      },
+      {
+        "key": "temporaryAccessPass",
+        "templateOptions": {
+          "label": "Create Temporary Access Pass Now",
+          "useSwitch": true,
+          "checkboxLabel": "Yes"
+        },
+        "type": "boolean",
+        "summaryVisibility": "Show",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": false
+      },
+      {
+        "key": "tempAccessPass",
+        "templateOptions": {
+          "label": "Temporary Access Pass",
+          "required": true,
+          "grid": {
+            "columns": [
+              {
+                "headerName": "Temporary Access Pass",
+                "field": "temporaryAccessPass"
+              },
+              {
+                "headerName": "Is Usable",
+                "field": "isUsable"
+              },
+              {
+                "headerName": "Is Usable Once",
+                "field": "isUsableOnce"
+              },
+              {
+                "headerName": "Lifetime In Minutes",
+                "field": "lifetimeInMinutes"
+              },
+              {
+                "headerName": "Method Usability Reason",
+                "field": "methodUsabilityReason"
+              },
+              {
+                "headerName": "Start Date Time",
+                "field": "startDateTime"
+              },
+              {
+                "headerName": "Created Date Time",
+                "field": "createdDateTime"
+              }
+            ],
+            "height": 200,
+            "rowSelection": "single"
+          },
+          "dataSourceConfig": {
+            "dataSourceGuid": "$dataSourceGuid_1",
+            "input": {
+              "propertyInputs": [
+                {
+                  "propertyName": "selectedUser",
+                  "otherFieldValue": {
+                    "otherFieldKey": "gridUsers"
+                  }
+                },
+                {
+                  "propertyName": "lifetimeMinutes",
+                  "otherFieldValue": {
+                    "otherFieldKey": "lifteTimeMinutes"
+                  }
+                },
+                {
+                  "propertyName": "isUsableOnce",
+                  "otherFieldValue": {
+                    "otherFieldKey": "isUsableOnce"
+                  }
+                }
+              ]
+            }
+          },
+          "useFilter": true,
+          "useDefault": true,
+          "searchPlaceHolder": "Search this data",
+          "allowCsvDownload": true,
+          "defaultSelectorProperty": "temporaryAccessPass"
+        },
+        "hideExpression": "!model[\"temporaryAccessPass\"]",
+        "type": "grid",
+        "summaryVisibility": "Show",
+        "requiresTemplateOptions": true,
+        "requiresKey": true,
+        "requiresDataSource": true
+      }
+    ]
+  }
 ]

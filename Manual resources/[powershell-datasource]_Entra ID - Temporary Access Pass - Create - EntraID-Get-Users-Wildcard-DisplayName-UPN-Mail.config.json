@@ -1,4 +1,4 @@
 {
-    "name":  "Entra ID - Temporary Access Pass - Create | EntraID-Get-Users-Wildcard-DisplayName-UPN-Mail",
-    "runInCloud":  true
+  "name": "Entra ID - Temporary Access Pass - Create | EntraID-Get-Users-Wildcard-DisplayName-UPN-Mail",
+  "runInCloud": true
 }

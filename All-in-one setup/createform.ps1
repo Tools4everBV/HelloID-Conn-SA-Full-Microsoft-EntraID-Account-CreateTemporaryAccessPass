@@ -16,34 +16,33 @@ $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID re
 #NOTE: You can also update the HelloID Global variable values afterwards in the HelloID Admin Portal: https://<CUSTOMER>.helloid.com/admin/variablelibrary
 $globalHelloIDVariables = [System.Collections.Generic.List[object]]@();
 
-#Global variable #1 >> EntraIdCertificateBase64String
-$tmpName = @'
-EntraIdCertificateBase64String
-'@ 
-$tmpValue = "" 
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
-
-#Global variable #2 >> EntraIDAppId
-$tmpName = @'
-EntraIDAppId
-'@ 
-$tmpValue = ""
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
-
-#Global variable #3 >> EntraIDtenantID
-$tmpName = @'
-EntraIDtenantID
-'@ 
-$tmpValue = "" 
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
-
-#Global variable #4 >> EntraIdCertificatePassword
+#Global variable #1 >> EntraIdCertificatePassword
 $tmpName = @'
 EntraIdCertificatePassword
 '@ 
 $tmpValue = "" 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
 
+#Global variable #2 >> EntraIdCertificateBase64String
+$tmpName = @'
+EntraIdCertificateBase64String
+'@ 
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
+
+#Global variable #3 >> EntraIDAppId
+$tmpName = @'
+EntraIDAppId
+'@ 
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
+
+#Global variable #4 >> EntraIDtenantID
+$tmpName = @'
+EntraIDtenantID
+'@ 
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
 
 #make sure write-information logging is visual
 $InformationPreference = "continue"
@@ -342,13 +341,13 @@ foreach ($item in $globalHelloIDVariables) {
 
 
 <# Begin: HelloID Data sources #>
-<# Begin: DataSource "Azure-AD-temp-access-pass-create-access-pass" #>
+<# Begin: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Temp-Access-Pass-Create-Access-Pass" #>
 $tmpPsScript = @'
 # Variables configured in form
 $userID = $datasource.selecteduser.ID
 $userDisplayname = $datasource.selecteduser.displayname
 $lifetimeMinutes = [int]$datasource.lifetimeMinutes
-$isUsableOnce = [int]$datasource.isUsableOnce
+$isUsableOnce = if($datasource.isUsableOnce -eq 'true') {$true} else {$false}
 $startdate = [System.DateTime]::Parse((Get-Date).DateTime)
 
 # Global variables
@@ -562,7 +561,7 @@ try {
     $body = @{
         startDateTime     = $startdate
         lifetimeInMinutes = $lifetimeMinutes
-        isUsableOnce      = $true
+        isUsableOnce      = $isUsableOnce
     } | ConvertTo-Json -Depth 10
     Write-Verbose "Created request body with lifetime of [$lifetimeMinutes] minutes"
 
@@ -579,12 +578,12 @@ try {
     }
 
     $result = Invoke-RestMethod @generateTAPSplatParams
-    Write-Information "Successfully generated Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$($result.lifetimeInMinutes)] minutes"
+    Write-Information "Successfully generated Temporary Access Pass for user [$userDisplayname ($userID)] with lifetime [$($result.lifetimeInMinutes)] minutes. [isUsableOnce] set to [$isUsableOnce]"
 
     $Log = @{
         Action            = "SetPassword" # optional. ENUM (undefined = default) 
         System            = "EntraID" # optional (free format text) 
-        Message           = "Successfully generated Temporary Access Pass with lifetime [$($result.lifetimeInMinutes)] minutes" # required (free format text) 
+        Message           = "Successfully generated Temporary Access Pass with lifetime [$($result.lifetimeInMinutes)] minutes. [isUsableOnce] set to [$isUsableOnce]" # required (free format text) 
         IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
         TargetDisplayName = $userDisplayname # optional (free format text) 
         TargetIdentifier  = $userID # optional (free format text) 
@@ -641,14 +640,14 @@ $tmpModel = @'
 [{"key":"id","type":0},{"key":"isUsable","type":0},{"key":"isUsableOnce","type":0},{"key":"temporaryAccessPass","type":0},{"key":"lifetimeInMinutes","type":0},{"key":"createdDateTime","type":0},{"key":"startDateTime","type":0},{"key":"methodUsabilityReason","type":0}]
 '@ 
 $tmpInput = @'
-[{"description":null,"translateDescription":false,"inputFieldType":1,"key":"selectedUser","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"lifetimeMinutes","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"isUsableOnce","type":0,"options":1}]
+[{"description":null,"translateDescription":false,"inputFieldType":1,"key":"selectedUser","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"lifetimeMinutes","type":0,"options":1},{"description":null,"translateDescription":false,"inputFieldType":1,"key":"isUsableOnce","type":0,"options":0}]
 '@ 
 $dataSourceGuid_1 = [PSCustomObject]@{} 
 $dataSourceGuid_1_Name = @'
-Azure-AD-temp-access-pass-create-access-pass
+Entra ID - Temporary Access Pass - Create | EntraID-Temp-Access-Pass-Create-Access-Pass
 '@ 
 Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -DataSourceRunInCloud "True" -returnObject ([Ref]$dataSourceGuid_1) 
-<# End: DataSource "Azure-AD-temp-access-pass-create-access-pass" #>
+<# End: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Temp-Access-Pass-Create-Access-Pass" #>
 
 <# Begin: DataSource "Entra ID - Temporary Access Pass - Create | EntraID-Get-Users-Wildcard-DisplayName-UPN-Mail" #>
 $tmpPsScript = @'
