@@ -241,7 +241,7 @@
         },
         "hideExpression": "!model[\"temporaryAccessPass\"]",
         "type": "grid",
-        "summaryVisibility": "Show",
+        "summaryVisibility": "Hide element",
         "requiresTemplateOptions": true,
         "requiresKey": true,
         "requiresDataSource": true
